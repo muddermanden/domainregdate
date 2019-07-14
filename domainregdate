@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+whois_query () {
+
+  local isodate_fmt="[12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])"
+  local shortdate_fmt="(([0-9])|([0-2][0-9])|([3][0-1]))\-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\-\d{4}"
+  local date_fmt="($isodate_fmt|$shortdate_fmt)"
+
+  DOMAIN_LIST="$(mktemp)"
+  {
+    for domain in "$@"
+    do
+      local whois="$(whois $domain)"
+      local rawline="$(echo "$whois" | egrep --max-count=1 'Creation Date:|Registered:|Domain record activated:|created:' | xargs)"
+      local dateonly="$(echo "$rawline" | grep -Po "$date_fmt")"
+      local isodate="$(echo $dateonly | { read gmt ; date -I -d "$gmt" ; })"
+      printf "%s: %s\n" $isodate $domain
+    done
+  } | sort -u > "$DOMAIN_LIST"
+
+  cat "$DOMAIN_LIST"
+
+}
+
+if [ $# -ge 1 ]
+then
+  mapfile < <(whois_query "$@")
+  printf "%s" "${MAPFILE[@]}" | sort
+else
+  echo 'Usage: domainregdate DOMAIN...'
+fi
